@@ -8,7 +8,14 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 8000;;
 
-app.use(cors());
+app.use(cors({
+  origin: [
+    "https://leadspro-major.vercel.app",
+    "http://localhost:3000"
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
 app.use(express.json());
 
 const multer = require('multer');
