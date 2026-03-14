@@ -25,9 +25,9 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     try {
       const [runsRes, statsRes, activityRes] = await Promise.all([
-        fetch('http://localhost:8000/admin/runs'),
-        fetch('http://localhost:8000/admin/stats'),
-        fetch('http://localhost:8000/admin/activity')
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/runs`)
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/stats`)
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/activity`)
       ]);
       
       const runsData = await runsRes.json();
@@ -56,7 +56,7 @@ export default function AdminDashboard() {
     setIsSaving(true);
     setSaveStatus(null);
     try {
-      const res = await fetch('http://localhost:8000/admin/config', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apifyToken })

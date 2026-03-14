@@ -30,7 +30,7 @@ export default function UserDashboard() {
     setResults([]);
 
     try {
-      const response = await fetch("http://localhost:8000/scrape", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/scrape`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -63,7 +63,7 @@ export default function UserDashboard() {
     formData.append("resume", file);
 
     try {
-      const response = await fetch("http://localhost:8000/parse-resume", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/parse-resume`, {
         method: "POST",
         body: formData,
       });
