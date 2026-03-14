@@ -25,8 +25,8 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     try {
       const [runsRes, statsRes, activityRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/runs`)
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/stats`)
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/runs`),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/stats`),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/activity`)
       ]);
       
