@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function AdminDashboard() {
   const [runs, setRuns] = useState<any[]>([]);
@@ -21,6 +22,25 @@ export default function AdminDashboard() {
   const [apifyToken, setApifyToken] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
+  const router = useRouter();
+
+  // Auth Check
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isLoggedIn = localStorage.getItem("isLoggedIn");
+      const userRole = localStorage.getItem("userRole");
+      if (isLoggedIn !== "true" || userRole !== "admin") {
+        router.push("/login");
+      }
+    }
+  }, [router]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("isLoggedIn");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("userEmail");
+    router.push("/login");
+  };
 
   const fetchData = async () => {
     try {
@@ -56,7 +76,7 @@ export default function AdminDashboard() {
     setIsSaving(true);
     setSaveStatus(null);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/config`), {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apifyToken })
@@ -206,9 +226,12 @@ export default function AdminDashboard() {
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
                 <span className="text-[10px] font-bold text-emerald-100 uppercase tracking-tighter">System Admin</span>
              </div>
-             <Link href="/login" className="p-2 text-slate-400 hover:text-red-400 transition-colors">
+             <button 
+                onClick={handleLogout}
+                className="p-2 text-slate-400 hover:text-red-400 transition-colors"
+             >
                 <LogOut className="w-5 h-5" />
-             </Link>
+             </button>
           </div>
         </div>
       </nav>

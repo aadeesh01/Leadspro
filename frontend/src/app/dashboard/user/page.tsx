@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { 
   Search, MapPin, Mail, Hash, Loader2, Download, 
   AlertCircle, Upload, FileText, CheckCircle2, User as UserIcon, LogOut 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function UserDashboard() {
   const [activeTab, setActiveTab] = useState<"manual" | "resume">("manual");
@@ -22,6 +23,25 @@ export default function UserDashboard() {
   const [uploadSuccess, setUploadSuccess] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+
+  // Auth Check
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isLoggedIn = localStorage.getItem("isLoggedIn");
+      const userRole = localStorage.getItem("userRole");
+      if (isLoggedIn !== "true" || userRole !== "user") {
+        router.push("/login");
+      }
+    }
+  }, [router]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("isLoggedIn");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("userEmail");
+    router.push("/login");
+  };
 
   const handleScrape = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,9 +136,12 @@ export default function UserDashboard() {
                 <UserIcon className="w-4 h-4 text-blue-400" />
                 <span className="text-xs font-medium">User Dashboard</span>
              </div>
-             <Link href="/login" className="p-2 text-slate-400 hover:text-red-400 transition-colors">
+             <button 
+                onClick={handleLogout}
+                className="p-2 text-slate-400 hover:text-red-400 transition-colors"
+             >
                 <LogOut className="w-5 h-5" />
-             </Link>
+             </button>
           </div>
         </div>
       </nav>
@@ -308,8 +331,8 @@ export default function UserDashboard() {
                       <div className="absolute inset-0 blur-xl bg-blue-500/20 animate-pulse rounded-full" />
                     </div>
                     <div className="text-center space-y-1">
-                      <p className="font-bold text-white uppercase tracking-widest text-xs">Processing Apify Engine</p>
-                      <p className="text-[10px] text-slate-500 italic">This usually takes 45-90 seconds...</p>
+                      <p className="font-bold text-white uppercase tracking-widest text-xs">Processing Local Engine</p>
+                      <p className="text-[10px] text-slate-500 italic">This usually takes 15-30 seconds...</p>
                     </div>
                   </motion.div>
                 ) : results.length > 0 ? (

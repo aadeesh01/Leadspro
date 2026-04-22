@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Mail, Lock, Loader2, ArrowRight } from "lucide-react";
 import Link from "next/link";
@@ -9,8 +9,36 @@ import { useRouter } from "next/navigation";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [sessionInfo, setSessionInfo] = useState({ email: "", role: "" });
+
+  // Check for existing session on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isLoggedIn = localStorage.getItem("isLoggedIn");
+      const userRole = localStorage.getItem("userRole");
+      const userEmail = localStorage.getItem("userEmail");
+      
+      if (isLoggedIn === "true") {
+         setSessionInfo({ email: userEmail || "", role: userRole || "" });
+         setShowWelcome(true);
+      }
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("isLoggedIn");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("userEmail");
+    setShowWelcome(false);
+  };
+
+  const handleContinue = () => {
+    if (sessionInfo.role === "admin") router.push("/dashboard/admin");
+    else router.push("/dashboard/user");
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,7 +46,14 @@ export default function LoginPage() {
     
     // Mock Login Logic
     setTimeout(() => {
-      if (email === "admin@pro.com") {
+      const role = email === "admin@pro.com" ? "admin" : "user";
+      
+      // Store session
+      localStorage.setItem("isLoggedIn", "true");
+      localStorage.setItem("userRole", role);
+      localStorage.setItem("userEmail", email);
+
+      if (role === "admin") {
         router.push("/dashboard/admin");
       } else {
         router.push("/dashboard/user");
@@ -46,52 +81,82 @@ export default function LoginPage() {
           <p className="text-slate-400">Sign in to manage your lead pipelines</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-400 ml-1 flex items-center gap-2">
-              <Mail className="w-4 h-4" /> Email Address
-            </label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@company.com"
-              className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/20 transition-all text-white"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex justify-between items-center ml-1">
-              <label className="text-sm font-medium text-slate-400 flex items-center gap-2">
-                <Lock className="w-4 h-4" /> Password
-              </label>
-              <a href="#" className="text-xs text-blue-400 hover:text-blue-300 transition-colors">Forgot?</a>
+        {showWelcome ? (
+          <div className="space-y-8 py-4">
+            <div className="text-center space-y-4">
+              <div className="w-20 h-20 bg-blue-500/10 rounded-3xl border border-blue-500/20 flex items-center justify-center mx-auto mb-2">
+                <Mail className="w-10 h-10 text-blue-400" />
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-2xl font-bold">Welcome Back</h2>
+                <p className="text-slate-400 text-sm">Signed in as <span className="text-blue-400 font-medium">{sessionInfo.email}</span></p>
+              </div>
             </div>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/20 transition-all text-white"
-            />
-          </div>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold text-lg transition-all shadow-xl shadow-blue-900/30 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group"
-          >
-            {isLoading ? (
-              <Loader2 className="w-6 h-6 animate-spin" />
-            ) : (
-              <>
-                Continue to Dashboard <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </>
-            )}
-          </button>
-        </form>
+            <div className="space-y-4">
+              <button
+                onClick={handleContinue}
+                className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold text-lg transition-all shadow-xl shadow-blue-900/30 flex items-center justify-center gap-2 group"
+              >
+                Go to Dashboard <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </button>
+              
+              <button
+                onClick={handleLogout}
+                className="w-full py-4 px-6 bg-slate-950/50 border border-slate-800 hover:border-slate-700 text-slate-300 rounded-2xl font-bold text-base transition-all flex items-center justify-center gap-2"
+              >
+                Sign out & use different account
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-400 ml-1 flex items-center gap-2">
+                <Mail className="w-4 h-4" /> Email Address
+              </label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@company.com"
+                className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/20 transition-all text-white"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between items-center ml-1">
+                <label className="text-sm font-medium text-slate-400 flex items-center gap-2">
+                  <Lock className="w-4 h-4" /> Password
+                </label>
+                <a href="#" className="text-xs text-blue-400 hover:text-blue-300 transition-colors">Forgot?</a>
+              </div>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/20 transition-all text-white"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold text-lg transition-all shadow-xl shadow-blue-900/30 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group"
+            >
+              {isLoading ? (
+                <Loader2 className="w-6 h-6 animate-spin" />
+              ) : (
+                <>
+                  Continue to Dashboard <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
+            </button>
+          </form>
+        )}
 
         <div className="mt-8 text-center text-sm text-slate-500">
           Don't have an account?{" "}
