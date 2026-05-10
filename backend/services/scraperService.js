@@ -5,92 +5,65 @@ const cheerio = require('cheerio');
 puppeteer.use(StealthPlugin());
 
 /**
- * Scraper Service - Replaces Apify Indeed Scraper
- * Uses Puppeteer to find leads based on keywords and location.
+ * Scraper Service - Replaces Indeed Scraper
+ * Uses SimplyHired to bypass strict Cloudflare blocks while still providing accurate leads.
  */
 class ScraperService {
     async scrape({ keywords, location, maxEmails = 10 }) {
-        console.log(`Starting local scrape: keywords="${keywords}", location="${location}"`);
+        // Use the 'OR' boolean operator so the search engine finds jobs matching ANY of the keywords, not ALL
+        const keywordsStr = Array.isArray(keywords) ? keywords.join(' OR ') : keywords;
+        console.log(`Starting SimplyHired scrape for: keywords="${keywordsStr}", location="${location}"`);
         
-        const browser = await puppeteer.launch({
-            headless: "new",
-            args: [
-                '--no-sandbox', 
-                '--disable-setuid-sandbox',
-                '--disable-blink-features=AutomationControlled'
-            ]
-        });
-
+        let browser;
         try {
-            const page = await browser.newPage();
-            await page.setViewport({ width: 1280, height: 800 });
-            
-            // Set a realistic User Agent
-            await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36');
-
-            const searchUrl = `https://www.indeed.com/`;
-            console.log(`Navigating to: ${searchUrl}`);
-            await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 60000 });
-
-            // Diagnostic: save page if expected selector is missing
-            const whatSelector = '#text-input-what';
-            const inputExists = await page.$(whatSelector);
-            
-            if (!inputExists) {
-                console.log('Main search selector not found. Saving diagnostic HTML.');
-                const content = await page.content();
-                const fs = require('fs');
-                const path = require('path');
-                fs.writeFileSync(path.join(process.cwd(), 'debug_indeed_fail.html'), content);
-                
-                const title = await page.title();
-                console.log(`Page title: ${title}`);
-                if (title.includes('hCaptcha') || title.includes('CAPTCHA') || title.includes('Human')) {
-                    throw new Error('Indeed triggered a CAPTCHA/Challenge page. Please try again later or use a proxy.');
-                }
-                throw new Error(`Expected search selector ${whatSelector} not found on page.`);
+            const launchOptions = {
+                headless: 'new',
+                args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+            };
+            if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+                launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
             }
 
-            // Type keywords and location
-            console.log('Typing search query...');
-            await page.type(whatSelector, keywords, { delay: 100 });
+            browser = await puppeteer.launch(launchOptions);
+            const page = await browser.newPage();
+            await page.setViewport({ width: 1280, height: 800 });
+
+            // Determine TLD based on location to ensure results
+            let tld = 'com';
+            const locLower = location ? location.toLowerCase() : '';
+            if (locLower.includes('india') || locLower === 'in') tld = 'co.in';
+            else if (locLower.includes('uk') || locLower.includes('kingdom')) tld = 'co.uk';
+            else if (locLower.includes('canada')) tld = 'ca';
+            else if (locLower.includes('australia')) tld = 'com.au';
+
+            const searchUrl = `https://www.simplyhired.${tld}/search?q=${encodeURIComponent(keywordsStr)}&l=${encodeURIComponent(location || '')}`;
+            console.log(`Navigating to: ${searchUrl}`);
             
-            // Clear default location and type new one
-            await page.click('#text-input-where');
-            await page.keyboard.down('Control');
-            await page.keyboard.press('A');
-            await page.keyboard.up('Control');
-            await page.keyboard.press('Backspace');
-            await page.type('#text-input-where', location, { delay: 100 });
-
-            await Promise.all([
-                page.click('button[type="submit"]'),
-                page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 })
-            ]);
-
-            // Check for results
+            await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+            
             const content = await page.content();
             const $ = cheerio.load(content);
             const results = [];
-            
-            // Indeed Job Card selectors (they update frequently, let's try common ones)
-            $('.job_seen_beacon, .result').each((i, el) => {
+
+            $('[data-testid="searchSerpJob"]').each((i, el) => {
                 if (results.length >= maxEmails) return;
 
-                const resultTitle = $(el).find('h2.jobTitle, .jobTitle').text().trim();
-                const companyName = $(el).find('[data-testid="company-name"], .companyName').text().trim();
-                const jobLocation = $(el).find('[data-testid="text-location"], .companyLocation').text().trim();
-                const url = $(el).find('a').attr('href');
-                const snippet = $(el).find('.job-snippet, .summary').text().trim();
+                const titleElem = $(el).find('a').first();
+                const title = titleElem.text().trim();
+                const url = titleElem.attr('href');
+                const company = $(el).find('[data-testid="companyName"]').text().trim();
+                const jobLocation = $(el).find('[data-testid="searchSerpJobLocation"]').text().trim();
+                const snippet = $(el).find('[data-testid="searchSerpJobSnippet"]').text().trim() || $(el).find('p').text().trim();
 
-                if (resultTitle && companyName) {
+                if (title && company) {
                     results.push({
-                        title: resultTitle,
-                        company: companyName,
+                        title: title,
+                        company: company,
                         location: jobLocation || location,
-                        url: url ? `https://www.indeed.com${url}` : null,
+                        url: url ? `https://www.simplyhired.${tld}${url}` : null,
                         snippet: snippet,
-                        source: 'Indeed'
+                        source: 'SimplyHired',
+                        keyword: keywordsStr
                     });
                 }
             });
@@ -100,9 +73,9 @@ class ScraperService {
 
         } catch (error) {
             console.error('Scraper error:', error);
-            throw error;
+            throw new Error(`Failed to fetch jobs: ${error.message}`);
         } finally {
-            await browser.close();
+            if (browser) await browser.close();
         }
     }
 }

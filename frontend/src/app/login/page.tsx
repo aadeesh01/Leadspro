@@ -40,26 +40,34 @@ export default function LoginPage() {
     else router.push("/dashboard/user");
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Mock Login Logic
-    setTimeout(() => {
-      const role = email === "admin@pro.com" ? "admin" : "user";
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
       
-      // Store session
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("userRole", role);
-      localStorage.setItem("userEmail", email);
+      if (!res.ok) throw new Error(data.error || "Login failed");
 
-      if (role === "admin") {
+      localStorage.setItem("isLoggedIn", "true");
+      localStorage.setItem("userRole", data.user.role);
+      localStorage.setItem("userEmail", data.user.email);
+
+      if (data.user.role === "admin") {
         router.push("/dashboard/admin");
       } else {
         router.push("/dashboard/user");
       }
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (

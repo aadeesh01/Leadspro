@@ -11,17 +11,13 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 export default function AdminDashboard() {
-  const [runs, setRuns] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [stats, setStats] = useState<any>(null);
   const [activity, setActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   
-  // Settings State
-  const [showSettings, setShowSettings] = useState(false);
-  const [apifyToken, setApifyToken] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
   const router = useRouter();
 
   // Auth Check
@@ -44,17 +40,17 @@ export default function AdminDashboard() {
 
   const fetchData = async () => {
     try {
-      const [runsRes, statsRes, activityRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/runs`),
+      const [usersRes, statsRes, activityRes] = await Promise.all([
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/users`),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/stats`),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/activity`)
       ]);
       
-      const runsData = await runsRes.json();
+      const usersData = await usersRes.json();
       const statsData = await statsRes.json();
       const activityData = await activityRes.json();
 
-      setRuns(runsData.runs || []);
+      setUsers(usersData.users || []);
       setStats(statsData);
       setActivity(activityData.activity || []);
       setLastUpdated(new Date());
@@ -71,131 +67,97 @@ export default function AdminDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleSaveConfig = async () => {
-    if (!apifyToken) return;
-    setIsSaving(true);
-    setSaveStatus(null);
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/config`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apifyToken })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setSaveStatus({ type: 'success', msg: "API Token updated successfully" });
-        setTimeout(() => setShowSettings(false), 2000);
-        fetchData();
-      } else {
-        setSaveStatus({ type: 'error', msg: data.error || "Failed to update token" });
-      }
-    } catch (err) {
-      setSaveStatus({ type: 'error', msg: "Connection error" });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const displayStats = [
     { 
-      label: "Total Runs", 
-      val: runs.length.toString(), 
-      change: "+", 
-      icon: Activity, 
+      label: "Total Users", 
+      val: users.length.toString(), 
+      change: "Active", 
+      icon: Users, 
       color: "text-blue-400" 
     },
     { 
-      label: "Max Credits", 
-      val: stats?.usage?.maxCredits?.toString() || "0", 
-      change: "0%", 
-      icon: TrendingUp, 
-      color: "text-green-400" 
-    },
-    { 
-      label: "Data Retention", 
-      val: `${stats?.usage?.dataRetentionDays || 0}d`, 
-      change: "Fixed", 
-      icon: ShieldCheck, 
+      label: "Total Credits Used", 
+      val: stats?.usage?.creditsUsed?.toString() || "0", 
+      change: "System-wide", 
+      icon: Zap, 
       color: "text-purple-400" 
-    },
-    { 
-      label: "Plan", 
-      val: stats?.userInfo?.plan || "Free", 
-      change: "Active", 
-      icon: Users, 
-      color: "text-indigo-400" 
-    },
+    }
   ];
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col font-sans">
-      
-      {/* Settings Modal */}
+
+      {/* User Search History Modal */}
       <AnimatePresence>
-        {showSettings && (
+        {selectedUser && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-10">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setShowSettings(false)}
+              onClick={() => setSelectedUser(null)}
               className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 shadow-2xl overflow-hidden"
+              className="relative w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 shadow-2xl flex flex-col max-h-[90vh]"
             >
-              <div className="absolute top-0 right-0 p-6">
-                <button onClick={() => setShowSettings(false)} className="text-slate-500 hover:text-white transition-colors">
+              <div className="flex items-start justify-between mb-8">
+                <div>
+                  <h3 className="text-2xl font-black flex items-center gap-3">
+                    <Users className="w-6 h-6 text-blue-400" />
+                    Search History
+                  </h3>
+                  <p className="text-slate-400 mt-1 flex items-center gap-2">
+                    <Mail className="w-4 h-4" /> {selectedUser.email}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setSelectedUser(null)}
+                  className="p-2 bg-slate-800/50 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl transition-colors"
+                >
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <div className="p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 w-fit">
-                    <Key className="w-6 h-6 text-blue-400" />
-                  </div>
-                  <h2 className="text-2xl font-black">API Configuration</h2>
-                  <p className="text-slate-500 text-sm">Update your Apify API Token for global scraper execution.</p>
-                </div>
 
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] uppercase font-black tracking-widest text-slate-400">Apify API Token</label>
-                    <input 
-                      type="password"
-                      value={apifyToken}
-                      onChange={(e) => setApifyToken(e.target.value)}
-                      placeholder="apify_api_..."
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-colors"
-                    />
+              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                {selectedUser.searches && selectedUser.searches.length > 0 ? (
+                  <div className="space-y-4">
+                    {selectedUser.searches.map((search: any, i: number) => (
+                      <div key={i} className="p-6 bg-slate-950/50 border border-slate-800 rounded-2xl relative overflow-hidden">
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500/50" />
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {search.keywords.map((kw: string, j: number) => (
+                                <span key={j} className="px-2.5 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-md text-[10px] font-black uppercase tracking-widest">
+                                  {kw}
+                                </span>
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-4 text-xs font-bold text-slate-500 uppercase tracking-widest">
+                              <span className="flex items-center gap-1.5"><Globe className="w-3.5 h-3.5" /> {search.location}</span>
+                              <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {new Date(search.timestamp).toLocaleString()}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <p className="text-2xl font-black text-white">{search.resultsCount}</p>
+                              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Leads Found</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  
-                  {saveStatus && (
-                    <div className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${saveStatus.type === 'success' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
-                      {saveStatus.type === 'success' ? <ShieldCheck className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
-                      {saveStatus.msg}
-                    </div>
-                  )}
-
-                  <button 
-                    onClick={handleSaveConfig}
-                    disabled={isSaving || !apifyToken}
-                    className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-2xl font-bold uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2"
-                  >
-                    {isSaving ? (
-                      <Activity className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" />
-                        Update Infrastructure
-                      </>
-                    )}
-                  </button>
-                </div>
+                ) : (
+                  <div className="py-20 text-center text-slate-500 flex flex-col items-center">
+                    <Search className="w-12 h-12 opacity-20 mb-4" />
+                    <p className="font-bold uppercase tracking-widest text-xs">No searches recorded yet</p>
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
@@ -248,10 +210,6 @@ export default function AdminDashboard() {
             <p className="text-slate-500 text-sm">Real-time diagnostics and global lead generation metrics • Last updated: {lastUpdated.toLocaleTimeString()}</p>
           </div>
           <div className="flex gap-3">
-             <button onClick={() => setShowSettings(true)} className="px-5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2">
-               <Settings className="w-3.5 h-3.5" />
-               API Configuration
-             </button>
              <button onClick={() => fetchData()} className="px-5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2">
                <Activity className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                Sync
@@ -290,16 +248,16 @@ export default function AdminDashboard() {
         {/* Main Dashboard Content */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* Recent Runs Table */}
+          {/* User Directory Table */}
           <div className="lg:col-span-8 bg-slate-900/40 border border-slate-800 rounded-[2.5rem] overflow-hidden flex flex-col shadow-2xl shadow-blue-900/5">
             <div className="p-8 border-b border-slate-800 flex items-center justify-between">
                <h3 className="font-bold flex items-center gap-2 text-sm uppercase tracking-widest">
-                 <Terminal className="w-5 h-5 text-blue-400" />
-                 Global Execution Logs
+                 <Users className="w-5 h-5 text-blue-400" />
+                 User Directory
                </h3>
                <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Listening...</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Live</span>
                </div>
             </div>
             <div className="overflow-x-auto">
@@ -307,46 +265,38 @@ export default function AdminDashboard() {
                  <thead>
                    <tr className="bg-slate-950/30">
                      <th className="px-8 py-5 text-[10px] uppercase font-black text-slate-500 tracking-widest text-center w-16">#</th>
-                     <th className="px-8 py-5 text-[10px] uppercase font-black text-slate-500 tracking-widest">Instance ID</th>
-                     <th className="px-8 py-5 text-[10px] uppercase font-black text-slate-500 tracking-widest">Operator</th>
-                     <th className="px-8 py-5 text-[10px] uppercase font-black text-slate-500 tracking-widest">Timestamp</th>
-                     <th className="px-8 py-5 text-[10px] uppercase font-black text-slate-500 tracking-widest text-right">State</th>
+                     <th className="px-8 py-5 text-[10px] uppercase font-black text-slate-500 tracking-widest">Email Identity</th>
+                     <th className="px-8 py-5 text-[10px] uppercase font-black text-slate-500 tracking-widest text-center">Total Searches</th>
+                     <th className="px-8 py-5 text-[10px] uppercase font-black text-slate-500 tracking-widest text-right">Action</th>
                    </tr>
                  </thead>
                  <tbody className="divide-y divide-slate-800/40">
                     <AnimatePresence mode="popLayout">
-                    {loading && runs.length === 0 ? (
+                    {loading && users.length === 0 ? (
                       <motion.tr initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                        <td colSpan={5} className="px-8 py-20 text-center">
+                        <td colSpan={4} className="px-8 py-20 text-center">
                           <div className="flex flex-col items-center gap-4">
                             <Activity className="w-10 h-10 text-slate-800 animate-pulse" />
-                            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Initializing Secure Connection...</p>
+                            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Loading User Data...</p>
                           </div>
                         </td>
                       </motion.tr>
-                    ) : runs.map((run, i) => (
+                    ) : users.map((user, i) => (
                       <motion.tr 
-                        key={run.id} 
+                        key={user.email} 
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: i * 0.05 }}
-                        className="hover:bg-slate-800/20 transition-colors group"
+                        className="hover:bg-slate-800/20 transition-colors group cursor-pointer"
+                        onClick={() => setSelectedUser(user)}
                       >
                         <td className="px-8 py-5 text-center text-[10px] font-black text-slate-700">{i + 1}</td>
-                        <td className="px-8 py-5 font-mono text-[11px] text-blue-400/80 group-hover:text-blue-400 transition-colors">{run.id}</td>
-                        <td className="px-8 py-5">
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-400 shadow-inner">
-                              {stats?.userInfo?.username?.[0]?.toUpperCase() || 'S'}
-                            </div>
-                            <span className="font-bold text-white text-xs">{stats?.userInfo?.username || 'System'}</span>
-                          </div>
-                        </td>
-                        <td className="px-8 py-5 text-slate-500 text-[11px] font-medium">{new Date(run.startedAt).toLocaleString()}</td>
+                        <td className="px-8 py-5 font-bold text-sm text-slate-200">{user.email}</td>
+                        <td className="px-8 py-5 text-center text-blue-400 font-black">{user.searches?.length || 0}</td>
                         <td className="px-8 py-5 text-right">
-                          <span className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-tighter border ${run.status === 'SUCCEEDED' ? 'bg-green-500/5 text-green-400 border-green-500/20 shadow-[0_0_10px_rgba(74,222,128,0.05)]' : 'bg-red-500/5 text-red-400 border-red-500/20 shadow-[0_0_10px_rgba(248,113,113,0.05)]'}`}>
-                            {run.status === 'SUCCEEDED' ? 'Complete' : run.status}
-                          </span>
+                          <button className="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-end gap-2 ml-auto">
+                            <Search className="w-3 h-3" /> History
+                          </button>
                         </td>
                       </motion.tr>
                     ))}
